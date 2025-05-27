@@ -17,7 +17,9 @@ function updateButtonStyles(currentRate) {
         const buttons = container.querySelectorAll("button");
         buttons.forEach((button) => {
             // Compare speed with a tolerance due to potential floating point inaccuracies.
-            if (Math.abs(parseFloat(button.dataset.speed) - currentRate) < 0.01) {
+            if (
+                Math.abs(parseFloat(button.dataset.speed) - currentRate) < 0.01
+            ) {
                 button.style.color = "#0f0f0f"; // Active button text color (dark)
                 button.style.background = "#f1f1f1"; // Active button background (light)
             } else {
@@ -29,39 +31,39 @@ function updateButtonStyles(currentRate) {
 }
 
 /**
- * Creates and adds the speed control buttons to the YouTube player UI.
+ * Creates and adds the speed control buttons to the YouTube video title area.
  * This function is idempotent; it checks if the buttons' container (`speed-control-container`)
  * already exists before creating new buttons, preventing duplicates.
  */
 function addSpeedControlButtons() {
-    const playerControls = document.querySelector("div.ytp-right-controls");
+    const titleContainer = document.querySelector("#above-the-fold #title");
     // Use `currentVideoElement` if it's already known (e.g., from a previous `applySpeed` call).
     // Otherwise, query the DOM for a video element. This `activeVideo` is primarily for
     // determining the initial playback rate to style buttons correctly if `currentVideoElement` isn't set yet.
-    const activeVideo = currentVideoElement || document.querySelector("video"); 
+    const activeVideo = currentVideoElement || document.querySelector("video");
 
     // Proceed only if:
     // 1. An active video element is found.
-    // 2. The YouTube player's right controls container is found.
+    // 2. The YouTube title container is found.
     // 3. The speed control button container has not already been added (idempotency check).
     if (
         activeVideo &&
-        playerControls &&
+        titleContainer &&
         !document.getElementById("speed-control-container")
     ) {
         const container = document.createElement("div");
         container.id = "speed-control-container"; // Used for idempotency and potentially for styling via CSS.
-        container.style.display = "inline-flex";  // Align buttons horizontally.
-        container.style.gap = "5px";              // Space between buttons.
-        container.style.marginLeft = "10px";      // Space from other YouTube controls on the left.
+        container.style.display = "inline-flex"; // Align buttons horizontally.
+        container.style.gap = "5px"; // Space between buttons.
+        container.style.marginLeft = "15px"; // Space from the title text.
 
         const speeds = [1, 1.5, 2]; // Define the available speed options.
 
         speeds.forEach((speed) => {
             const button = document.createElement("button");
             // Store the speed value on the button's dataset for easy access in event listeners and styling.
-            button.dataset.speed = speed; 
-            
+            button.dataset.speed = speed;
+
             // Structure attempts to mimic YouTube's button styling classes for visual consistency.
             const div = document.createElement("div");
             div.id = "speed-control-button-" + speed; // Unique ID for each button's inner div.
@@ -101,10 +103,12 @@ function addSpeedControlButtons() {
             button.appendChild(div);
             container.appendChild(button);
         });
-        
-        // Add the newly created container with all its buttons to the player's right controls area.
-        // `prepend` is used to place our buttons before other controls like "Settings", "Subtitles", etc.
-        playerControls.prepend(container); 
+
+        // Add the newly created container with all its buttons to the title area.
+        // `appendChild` is used to place our buttons after the title text.
+        titleContainer.appendChild(container);
+        titleContainer.style.display = "flex";
+        titleContainer.style.justifyContent = "space-between";
 
         // Set initial button styles based on the current video's playback rate.
         // `activeVideo` (derived from `currentVideoElement` or a fresh query) is used here.
@@ -145,12 +149,18 @@ function applySpeed(speedValue, videoElement) {
         // 3. Add the 'ratechange' listener to the new `currentVideoElement`.
         if (currentVideoElement !== videoElement) {
             if (currentVideoElement) {
-                currentVideoElement.removeEventListener("ratechange", handleRateChange);
+                currentVideoElement.removeEventListener(
+                    "ratechange",
+                    handleRateChange
+                );
             }
             currentVideoElement = videoElement; // Update the global reference.
-            currentVideoElement.addEventListener("ratechange", handleRateChange);
+            currentVideoElement.addEventListener(
+                "ratechange",
+                handleRateChange
+            );
         }
-        
+
         videoElement.playbackRate = parseFloat(speedValue); // Set the actual playback speed on the video.
 
         // Update button styles immediately. The 'ratechange' event might not fire if the
@@ -185,7 +195,10 @@ function applyDefaultSpeedSettings() {
                         // 1. Apply the default speed.
                         // 2. Also re-apply if it's the same `currentVideoElement` but its speed was reset
                         //    (e.g., by YouTube after an ad finishes, or by other extensions).
-                        if (newVideo !== currentVideoElement || newVideo.playbackRate !== defaultSpeedValue) {
+                        if (
+                            newVideo !== currentVideoElement ||
+                            newVideo.playbackRate !== defaultSpeedValue
+                        ) {
                             applySpeed(defaultSpeedValue, newVideo);
                         }
                         // This observer should remain active for the lifetime of the content script on the page.
@@ -195,7 +208,10 @@ function applyDefaultSpeedSettings() {
                         // No `obs.disconnect()` here.
                     }
                 });
-                videoObserver.observe(document.body, { childList: true, subtree: true });
+                videoObserver.observe(document.body, {
+                    childList: true,
+                    subtree: true,
+                });
             }
         }
     });
@@ -210,19 +226,19 @@ function applyDefaultSpeedSettings() {
  * (via the `yt-navigate-finish` event).
  */
 function initializeExtensionFeatures() {
-    const playerControls = document.querySelector("div.ytp-right-controls");
+    const titleContainer = document.querySelector("#above-the-fold #title");
     const video = document.querySelector("video");
 
-    // Only proceed if essential player elements (controls and video) are found.
+    // Only proceed if essential elements (title container and video) are found.
     // This check helps ensure that the logic primarily runs on actual video watch pages.
-    if (playerControls && video) {
-        addSpeedControlButtons();    // Idempotent: adds buttons if they are not already present.
+    if (titleContainer && video) {
+        addSpeedControlButtons(); // Idempotent: adds buttons if they are not already present.
         applyDefaultSpeedSettings(); // Applies stored default speed and sets up necessary video observers.
-    } else if (document.querySelector("ytd-watch-flexy[video-id]")) { 
-        // Fallback for video pages where player elements might load with a slight delay.
+    } else if (document.querySelector("ytd-watch-flexy[video-id]")) {
+        // Fallback for video pages where elements might load with a slight delay.
         // `ytd-watch-flexy[video-id]` is a more specific selector for YouTube's main video watch page container
         // that has a video-id attribute, indicating it's very likely a video page.
-        // If this container is present but controls/video aren't yet found, retry initialization shortly.
+        // If this container is present but title/video aren't yet found, retry initialization shortly.
         // This helps catch cases where the page structure is partially loaded when the script first runs.
         setTimeout(initializeExtensionFeatures, 300); // Retry after 300ms.
     }
@@ -234,31 +250,33 @@ function initializeExtensionFeatures() {
 let initialPlayerObserver = null;
 
 /**
- * Sets up a MutationObserver (`initialPlayerObserver`) to watch for the YouTube player
- * controls and video element to appear in the DOM for the first time on a page load.
+ * Sets up a MutationObserver (`initialPlayerObserver`) to watch for the YouTube title
+ * container and video element to appear in the DOM for the first time on a page load.
  * Once detected, it initializes the extension features and disconnects itself,
  * as further page changes will be handled by `yt-navigate-finish`.
  */
 function observeInitialPlayer() {
     // Prevent setting up multiple observers if this function is somehow called multiple times.
-    if (initialPlayerObserver) return; 
+    if (initialPlayerObserver) return;
 
     initialPlayerObserver = new MutationObserver((mutations, obs) => {
-        const controls = document.querySelector("div.ytp-right-controls");
+        const titleContainer = document.querySelector("#above-the-fold #title");
         const video = document.querySelector("video");
-        
-        // When both player controls and a video element are available:
-        if (controls && video) {
+
+        // When both title container and a video element are available:
+        if (titleContainer && video) {
             initializeExtensionFeatures(); // Set up the extension's UI and speed settings.
-            obs.disconnect();             // Stop this observer; its job is done for this initial page load.
+            obs.disconnect(); // Stop this observer; its job is done for this initial page load.
             initialPlayerObserver = null; // Clear the observer instance variable.
         }
     });
 
     // Start observing the entire document body for changes in the DOM structure (additions/removals of nodes).
-    initialPlayerObserver.observe(document.body, { childList: true, subtree: true });
+    initialPlayerObserver.observe(document.body, {
+        childList: true,
+        subtree: true,
+    });
 }
-
 
 // --- Script Execution Start: Handles initial page load and SPA navigation events ---
 
@@ -267,11 +285,11 @@ function observeInitialPlayer() {
 // Otherwise (if DOMContentLoaded has already fired), proceed with setup immediately.
 if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => {
-        observeInitialPlayer();        // Start observing for the player to appear on the page.
+        observeInitialPlayer(); // Start observing for the player to appear on the page.
         initializeExtensionFeatures(); // Attempt initialization immediately (elements might be ready by now).
     });
 } else {
-    observeInitialPlayer();        // Start observing for the player.
+    observeInitialPlayer(); // Start observing for the player.
     initializeExtensionFeatures(); // Attempt initialization.
 }
 
