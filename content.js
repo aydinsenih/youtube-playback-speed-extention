@@ -4,6 +4,15 @@
 // or when ads cause the video player to be temporarily replaced.
 let currentVideoElement = null;
 
+/**
+ * Determines whether the current page is a YouTube Short.
+ * Shorts URLs contain "/shorts/" in their path (e.g. youtube.com/shorts/abc123).
+ * @returns {boolean} True if the user is watching a Short.
+ */
+function isShortsPage() {
+    return window.location.pathname.includes("/shorts/");
+}
+
 // --- Button UI Functions ---
 
 /**
@@ -177,6 +186,27 @@ function applySpeed(speedValue, videoElement) {
  * appears or if the video element is dynamically replaced (common after ads).
  */
 function applyDefaultSpeedSettings() {
+    // Shorts always play at 1x, regardless of the saved default speed.
+    if (isShortsPage()) {
+        const video = document.querySelector("video");
+        if (video) {
+            applySpeed(1, video);
+        } else {
+            const shortsObserver = new MutationObserver(() => {
+                if (!isShortsPage()) return; // User navigated away from Shorts.
+                const newVideo = document.querySelector("video");
+                if (newVideo && newVideo.playbackRate !== 1) {
+                    applySpeed(1, newVideo);
+                }
+            });
+            shortsObserver.observe(document.body, {
+                childList: true,
+                subtree: true,
+            });
+        }
+        return;
+    }
+
     chrome.storage.sync.get("defaultSpeed", (data) => {
         if (data.defaultSpeed) {
             const defaultSpeedValue = parseFloat(data.defaultSpeed);
@@ -189,6 +219,10 @@ function applyDefaultSpeedSettings() {
                 // If no video element is initially found, set up a MutationObserver.
                 // This observer watches for additions to the DOM, specifically looking for a video element.
                 const videoObserver = new MutationObserver((mutations, obs) => {
+                    // This observer persists across SPA navigations. If the user has moved
+                    // to a Shorts page, do nothing here so the video speed never overwrites
+                    // the 1x that Shorts are forced to.
+                    if (isShortsPage()) return;
                     const newVideo = document.querySelector("video"); // Check again for a video element.
                     if (newVideo) {
                         // When a video element appears:
@@ -226,8 +260,21 @@ function applyDefaultSpeedSettings() {
  * (via the `yt-navigate-finish` event).
  */
 function initializeExtensionFeatures() {
-    const titleContainer = document.querySelector("#above-the-fold #title");
     const video = document.querySelector("video");
+
+    // Shorts don't have the regular watch-page title container where the speed
+    // buttons are mounted, so we skip the button UI and only apply the saved
+    // default Shorts speed once a video element is present.
+    if (isShortsPage()) {
+        if (video) {
+            applyDefaultSpeedSettings();
+        } else {
+            setTimeout(initializeExtensionFeatures, 300); // Player not ready yet; retry shortly.
+        }
+        return;
+    }
+
+    const titleContainer = document.querySelector("#above-the-fold #title");
 
     // Only proceed if essential elements (title container and video) are found.
     // This check helps ensure that the logic primarily runs on actual video watch pages.

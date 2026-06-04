@@ -10,12 +10,26 @@
       width: 200px;
       padding: 10px;
     }
-    select {
-      width: 100%;
-      padding: 5px;
-      font-size: 14px;
+    .speed-options {
+      display: flex;
+      gap: 6px;
     }
-    button {
+    .speed-btn {
+      flex: 1;
+      padding: 6px 0;
+      font-size: 14px;
+      border: 1px solid #ccc;
+      background-color: #f5f5f5;
+      color: #333;
+      cursor: pointer;
+      border-radius: 4px;
+    }
+    .speed-btn.selected {
+      background-color: #ff0000;
+      color: white;
+      border-color: #ff0000;
+    }
+    #saveButton {
       width: 100%;
       padding: 5px;
       background-color: #ff0000;
@@ -30,11 +44,11 @@
 </head>
 <body>
   <h3>Select Default Speed</h3>
-  <select id="speedSelector">
-    <option value="1">1x</option>
-    <option value="1.5">1.5x</option>
-    <option value="2">2x</option>
-  </select>
+  <div class="speed-options" id="speedOptions">
+    <button class="speed-btn" data-speed="1">1x</button>
+    <button class="speed-btn" data-speed="1.5">1.5x</button>
+    <button class="speed-btn" data-speed="2">2x</button>
+  </div>
   <button id="saveButton">Save</button>
   <p id="statusMessage"></p>
 
